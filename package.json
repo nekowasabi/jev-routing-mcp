@@ -1,0 +1,14 @@
+{
+  "name": "jev-routing-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "jev-routing System One MCP — on-device tool routing, or TypeSafe jev-latest when TYPESAFE_API_KEY is set.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.ts",
+    "stdio": "node server.ts --stdio"
+  }
+}

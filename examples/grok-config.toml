@@ -1,0 +1,15 @@
+# Copy into ~/.grok/config.toml (or a project .grok/config.toml).
+# Grok spawns the server over stdio. No pre-started HTTP process is required.
+
+[mcp_servers.jev-routing]
+command = "node"
+args = [
+    "${HOME}/repos/jev-routing-mcp/server.ts",
+    "--stdio",
+]
+enabled = true
+startup_timeout_sec = 45
+
+[mcp_servers.jev-routing.env]
+JEV_ROUTING_HARNESS = "grok"
+TYPESAFE_API_KEY = "${TYPESAFE_API_KEY}"

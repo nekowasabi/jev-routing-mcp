@@ -1,0 +1,15 @@
+# Copy into ~/.codex/config.toml (or a trusted project's .codex/config.toml).
+# Codex spawns the server over stdio. No pre-started HTTP process is required.
+# https://developers.openai.com/codex/mcp
+
+[mcp_servers.jev-routing]
+command = "node"
+args = [
+    "${HOME}/repos/jev-routing-mcp/server.ts",
+    "--stdio",
+]
+startup_timeout_sec = 45
+
+[mcp_servers.jev-routing.env]
+JEV_ROUTING_HARNESS = "codex"
+TYPESAFE_API_KEY = "${TYPESAFE_API_KEY}"

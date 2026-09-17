@@ -1,39 +1,39 @@
 # jev-routing MCP
 
-LLM の tool 判断を System One に置換する MCP サーバーです。  
-キーなしではオンデバイス、`TYPESAFE_API_KEY` があれば本物の **Jev** (`jev-latest`) に飛びます。
+An MCP server that replaces the LLM's tool decisions with System One.  
+Without a key it runs on-device; with `TYPESAFE_API_KEY` it calls the real **Jev** (`jev-latest`).
 
-Node 22 以上。依存パッケージはありません。解凍してすぐ起動できます。
+Node 22 or newer. No dependencies. Unpack it and start it right away.
 
-## 起動
+## Startup
 
 ```bash
 cd jev-routing-mcp
 npm start
 ```
 
-または:
+Or:
 
 ```bash
 node bin/server.js
 ```
 
-既定は `http://127.0.0.1:8787/mcp`。
+The default is `http://127.0.0.1:8787/mcp`.
 
-本物の Jev を使う場合:
+To use the real Jev:
 
 ```bash
 export TYPESAFE_API_KEY=ts_...
 node bin/server.js
 ```
 
-ポートを変える: `PORT=9000 node bin/server.js`
+To change the port: `PORT=9000 node bin/server.js`
 
-## クライアント接続
+## Client setup
 
 ### Cursor
 
-`.cursor/mcp.json` または Settings → MCP:
+`.cursor/mcp.json` or Settings → MCP:
 
 ```json
 {
@@ -49,21 +49,21 @@ node bin/server.js
 }
 ```
 
-キーを環境変数に置いているなら `headers` は省略できます（サーバー側が読みます）。
+If the key is in an environment variable, `headers` can be omitted (the server reads it).
 
 ### Grok
 
-stdio（Grok がプロセスを起動する。HTTP サーバーは不要）:
+stdio (Grok launches the process; no HTTP server needed):
 
 ```bash
 grok mcp add jev-routing -- node "$HOME/repos/jev-routing-mcp/server.ts" --stdio
 ```
 
-または `examples/grok-config.toml` を `~/.grok/config.toml` に追記する。
+Or append `examples/grok-config.toml` to `~/.grok/config.toml`.
 
-Grok の TUI で tool 結果の先頭が `[JEV EXECUTED]` なら、Jev がフロンティアの tool 判断を置換した印。
-`phase=tool_loop` で tool loop 中はモデルを固定し、`loop.continue` / `loop.nextTool` を返す。
-複数ステップでは `actionsTaken` に実行済み tool と結果を渡す。`loop.gated` が true なら早期終了を差し戻しているので `loop.nextTool` に従う。
+In Grok's TUI, a tool result starting with `[JEV EXECUTED]` means Jev replaced the frontier model's tool decision.
+With `phase=tool_loop` the model stays fixed during the tool loop, and `loop.continue` / `loop.nextTool` are returned.
+For multi-step runs, pass the executed tools and their results in `actionsTaken`. If `loop.gated` is true, an early exit was rejected, so follow `loop.nextTool`.
 
 ### Claude Code
 
@@ -71,21 +71,21 @@ Grok の TUI で tool 結果の先頭が `[JEV EXECUTED]` なら、Jev がフロ
 claude mcp add --transport http jev-routing http://127.0.0.1:8787/mcp
 ```
 
-キーをヘッダで渡す場合はクライアントの HTTP headers 設定に  
-`Authorization: Bearer ts_...` を追加してください。
+To pass the key as a header, add  
+`Authorization: Bearer ts_...` to the client's HTTP headers setting.
 
 ### Codex
 
-stdio（Codex がプロセスを起動する。HTTP サーバーは不要）:
+stdio (Codex launches the process; no HTTP server needed):
 
 ```bash
 codex mcp add jev-routing --env JEV_ROUTING_HARNESS=codex -- node "$HOME/repos/jev-routing-mcp/server.ts" --stdio
 ```
 
-または `examples/codex-config.toml` を `~/.codex/config.toml` に追記する。
-TUI では `/mcp` で接続状態を確認できる。
+Or append `examples/codex-config.toml` to `~/.codex/config.toml`.
+In the TUI, `/mcp` shows the connection status.
 
-### 動作確認
+### Verifying it works
 
 ```bash
 curl -s http://127.0.0.1:8787/mcp \
@@ -93,7 +93,7 @@ curl -s http://127.0.0.1:8787/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-タイポ修正の振り分け:
+Routing a typo fix:
 
 ```bash
 curl -s http://127.0.0.1:8787/mcp \
@@ -101,7 +101,7 @@ curl -s http://127.0.0.1:8787/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"route_turn","arguments":{"request":"Rename User to user in src/auth.ts"}}}'
 ```
 
-破壊ゲート:
+Destructive gate:
 
 ```bash
 curl -s http://127.0.0.1:8787/mcp \
@@ -109,31 +109,31 @@ curl -s http://127.0.0.1:8787/mcp \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"gate_call","arguments":{"tool":"bash","args":"rm -rf /"}}}'
 ```
 
-## ツール
+## Tools
 
-| ツール | 用途 |
+| Tool | Purpose |
 |---|---|
-| `route_turn` | モデル階層・ロードする tool・スキル・思考量 |
-| `gate_call` | bash / write / edit の実行前ゲート |
-| `judge_output` | シークレット漏洩と失敗分類 |
-| `route_action` | ブラウザ操作と対象要素 |
-| `evaluate` | 任意の Choice / Score / Noul |
-| `screen` | プロンプトインジェクション審査 |
-| `verify` | 主張と証拠の突合 |
+| `route_turn` | Model tier, tools to load, skills, thinking budget |
+| `gate_call` | Pre-execution gate for bash / write / edit |
+| `judge_output` | Secret leakage and failure classification |
+| `route_action` | Browser actions and target elements |
+| `evaluate` | Arbitrary Choice / Score / Noul |
+| `screen` | Prompt injection screening |
+| `verify` | Claim-to-evidence matching |
 
-`engine: "local"` を引数に付けると、キーがあってもオンデバイスに固定します。
+Adding `engine: "local"` to the arguments pins execution on-device even when a key is present.
 
-## エンジン
+## Engines
 
-- **local** — Jev スキーマ互換のオンデバイス判定。キー不要
-- **live** — `POST https://api.typesafe.ai/v1/systemone`（`jev-latest`）
+- **local** — On-device decisions compatible with the Jev schema. No key required
+- **live** — `POST https://api.typesafe.ai/v1/systemone` (`jev-latest`)
 
-キーは次のどれかです。
+The key comes from one of the following.
 
-1. 環境変数 `TYPESAFE_API_KEY`
-2. リクエストヘッダ `Authorization: Bearer ts_...`
-3. リクエストヘッダ `x-typesafe-key`
+1. The `TYPESAFE_API_KEY` environment variable
+2. The `Authorization: Bearer ts_...` request header
+3. The `x-typesafe-key` request header
 
-## ソース
+## Source
 
-`src/` が判定エンジンと MCP ハンドラです。`bin/server.js` はそのバンドルです。UI は含めていません。
+`src/` holds the decision engine and the MCP handlers. `bin/server.js` is the bundle of those. No UI is included.

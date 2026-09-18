@@ -131,6 +131,15 @@ export type CostBreakdown = {
   routedUsd: number;
   frontierUsd: number;
   savings: number;
+  buckets: {
+    modelRoutingUsd: number;
+    judgementUsd: number;
+  };
+  speed: {
+    frontierMs: number;
+    routedMsHint: number;
+    jevMsHint: number;
+  };
 };
 
 export type LoopDecision = {

@@ -216,7 +216,7 @@ export async function routeTurn(
         ? { action: "none", confidence: 1, noul: 0 }
         : skill,
     loop: loopDecision(phase, res.answers, nextTool),
-    cost: costFor(applied.tier, Math.max(1, toolsToLoad.length)),
+    cost: costFor(applied.tier, Math.max(1, toolsToLoad.length), harness),
     latencyMs: res.latencyMs,
     engine,
     answers: res.answers,

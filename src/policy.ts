@@ -1,4 +1,12 @@
-import type { ClaudeModelId, CodexModelId, GrokModelId, Harness, ModelTier, Policy } from "./types.ts";
+import type {
+  ClaudeModelId,
+  CodexModelId,
+  CostBreakdown,
+  GrokModelId,
+  Harness,
+  ModelTier,
+  Policy,
+} from "./types.ts";
 
 export const DEFAULT_POLICY: Policy = {
   minConfidence: 0.6,
@@ -118,15 +126,24 @@ export function detectOverride(text: string): ModelTier | undefined {
   return undefined;
 }
 
-export function costFor(tier: ModelTier, toolCount: number): {
-  jevUsd: number;
-  routedUsd: number;
-  frontierUsd: number;
-  savings: number;
-} {
+export function costFor(tier: ModelTier, toolCount: number, harness: Harness): CostBreakdown {
   const thinkingTax = 0.018 * Math.max(0, toolCount - 1);
-  const routedUsd = TIER_META[tier].usdPerTurn + JEV_USD;
+  // Why: Instead of using TIER_META usdPerTurn on Grok, adopted modelRoutingUsd=0. Reason: modelIdFor(grok) is always grok-4.6, so luna/sol/astra prices do not apply.
+  const modelRoutingUsd =
+    harness === "grok" ? 0 : Math.max(0, FRONTIER_USD - TIER_META[tier].usdPerTurn);
+  const judgementUsd = thinkingTax;
+  const routedUsd =
+    harness === "grok" ? FRONTIER_USD + JEV_USD : TIER_META[tier].usdPerTurn + JEV_USD;
   const frontierUsd = FRONTIER_USD + thinkingTax;
   const savings = frontierUsd <= 0 ? 0 : (frontierUsd - routedUsd) / frontierUsd;
-  return { jevUsd: JEV_USD, routedUsd, frontierUsd, savings };
+  const routedMsHint =
+    harness === "grok" ? FRONTIER_MS + JEV_MS : TIER_META[tier].ms + JEV_MS;
+  return {
+    jevUsd: JEV_USD,
+    routedUsd,
+    frontierUsd,
+    savings,
+    buckets: { modelRoutingUsd, judgementUsd },
+    speed: { frontierMs: FRONTIER_MS, routedMsHint, jevMsHint: JEV_MS },
+  };
 }

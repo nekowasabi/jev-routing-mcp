@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node server.ts",
-    "stdio": "node server.ts --stdio"
+    "stdio": "node server.ts --stdio",
+    "test": "node --test tests/*.test.ts"
   }
 }

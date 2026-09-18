@@ -1,8 +1,54 @@
+import { appendFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { narrateAction, type McpActivity } from "./narrate.ts";
+import type { CostBreakdown, Harness } from "./types.ts";
 
 const MAX = 40;
 const log: McpActivity[] = [];
 let seq = 0;
+
+export function metricsPath(): string {
+  return process.env.JEV_ROUTING_METRICS_PATH || join(homedir(), ".jev-routing", "metrics.jsonl");
+}
+
+export function tokensEstFromBytes(bytes: number): number {
+  return Math.ceil(bytes / 4);
+}
+
+export type MetricsEvent = {
+  at: number;
+  tool: string;
+  engine: "local" | "live";
+  harness?: Harness;
+  phase?: string;
+  latencyMs?: number;
+  mcpRequestBytes: number;
+  mcpResponseBytes: number;
+  mcpUncompactedBytes: number;
+  tokensEst: { request: number; response: number };
+  buckets?: {
+    modelRoutingUsd: number;
+    judgementUsd: number;
+    mcpOverheadTokens: number;
+  };
+  heuristicUsd?: Pick<CostBreakdown, "jevUsd" | "routedUsd" | "frontierUsd" | "savings">;
+  speed?: { jevMs: number; frontierMs: number; routedMs: number };
+  toolsCatalog?: number;
+  toolsLoaded?: number;
+  summary: string;
+};
+
+export function appendMetrics(event: MetricsEvent): void {
+  // Why: Instead of throwing on log I/O, adopted fail-open. Reason: metrics must not fail the MCP call.
+  try {
+    const path = metricsPath();
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, `${JSON.stringify(event)}\n`);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function recordMcpActivity(input: {
   tool: string;

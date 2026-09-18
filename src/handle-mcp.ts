@@ -9,11 +9,18 @@ import {
   screenText,
   verifyClaims,
 } from "./dispatch.ts";
-import { recordMcpActivity } from "./mcp-log.ts";
+import { appendMetrics, recordMcpActivity, tokensEstFromBytes } from "./mcp-log.ts";
 import { executionBanner } from "./narrate.ts";
 import { MCP_GUIDE, MCP_PROTOCOL_VERSION, MCP_SERVER_INFO, MCP_TOOLS } from "./mcp-tools.ts";
 import { normalizePinned, parseHarness } from "./policy.ts";
-import type { Harness, JevExecution, SystemOneRequest, SystemOneResponse, ToolDef } from "./types.ts";
+import type {
+  CostBreakdown,
+  Harness,
+  LoadedTool,
+  SystemOneRequest,
+  SystemOneResponse,
+  ToolDef,
+} from "./types.ts";
 
 type Rpc = {
   jsonrpc?: string;
@@ -42,28 +49,140 @@ function pickProtocolVersion(requested: unknown) {
   return PROTOCOL_VERSIONS.includes(value) ? value : MCP_PROTOCOL_VERSION;
 }
 
-function wrapToolResult(name: string, result: unknown, activity: ReturnType<typeof recordMcpActivity>) {
+function compactResult(name: string, result: unknown): unknown {
+  if (!result || typeof result !== "object") return result;
+  const r = result as Record<string, unknown>;
+  if (name === "route_turn") {
+    const tools = Array.isArray(r.tools)
+      ? (r.tools as Pick<LoadedTool, "name" | "load" | "primary">[]).map((t) => ({
+          name: t.name,
+          load: Boolean(t.load),
+          primary: Boolean(t.primary),
+        }))
+      : [];
+    return {
+      harness: r.harness,
+      model: r.model,
+      effort: r.effort,
+      tools,
+      skill: r.skill,
+      loop: r.loop,
+      cost: r.cost,
+      latencyMs: r.latencyMs,
+      engine: r.engine,
+    };
+  }
+  const { answers: _answers, ...rest } = r;
+  return rest;
+}
+
+function wrapToolResult(
+  name: string,
+  result: unknown,
+  activity: ReturnType<typeof recordMcpActivity>,
+) {
   // Why: Banner goes in MCP text (and stderr) instead of only GET /mcp. Reason: Grok TUI shows tool-result text, so that is the visual proof Jev replaced frontier judgement.
-  const jev: JevExecution = {
-    executed: true,
-    replaced: "frontier_tool_judgment",
+  const jev = {
+    executed: true as const,
+    replaced: "frontier_tool_judgment" as const,
     tool: name,
     engine: activity.engine,
     summary: activity.summary,
-    spokenJa: activity.spokenJa,
-    spokenEn: activity.spokenEn,
   };
-  const payload =
-    result && typeof result === "object" ? { jev, ...(result as object) } : { jev, result };
+  // Why: Instead of pretty-printed answers, adopted compact load flags only. Reason: answers dominate MCP context and wipe the savings this layer is meant to measure.
+  const compact =
+    result && typeof result === "object"
+      ? { jev, ...(compactResult(name, result) as object) }
+      : { jev, result };
   const banner = executionBanner(activity);
   process.stderr.write(`${banner}\n`);
   return {
     content: [
       { type: "text", text: banner },
-      { type: "text", text: JSON.stringify(payload, null, 2) },
+      { type: "text", text: JSON.stringify(compact) },
     ],
-    structuredContent: payload,
+    structuredContent: compact,
   };
+}
+
+function recordCallMetrics(input: {
+  name: string;
+  args: Record<string, unknown>;
+  result: unknown;
+  wrapped: { content: { type: string; text: string }[] };
+  requestBytes: number;
+  engine: "local" | "live";
+  harness?: Harness;
+  summary: string;
+}) {
+  const compactText = input.wrapped.content.map((c) => c.text).join("\n");
+  const mcpResponseBytes = Buffer.byteLength(compactText);
+  const jev = {
+    executed: true,
+    replaced: "frontier_tool_judgment",
+    tool: input.name,
+    engine: input.engine,
+    summary: input.summary,
+  };
+  const uncompacted =
+    input.result && typeof input.result === "object"
+      ? { jev, ...(input.result as object) }
+      : { jev, result: input.result };
+  const mcpUncompactedBytes = Buffer.byteLength(JSON.stringify(uncompacted));
+  const r =
+    input.result && typeof input.result === "object"
+      ? (input.result as Record<string, unknown>)
+      : {};
+  const cost = r.cost as CostBreakdown | undefined;
+  const tools = Array.isArray(r.tools) ? (r.tools as { load?: boolean }[]) : [];
+  const latencyMs = typeof r.latencyMs === "number" ? r.latencyMs : undefined;
+  const overhead = tokensEstFromBytes(mcpResponseBytes);
+  appendMetrics({
+    at: Date.now(),
+    tool: input.name,
+    engine: input.engine,
+    harness: (typeof r.harness === "string" ? parseHarness(r.harness) : undefined) ?? input.harness,
+    phase:
+      input.args.phase === "tool_loop"
+        ? "tool_loop"
+        : input.name === "route_turn"
+          ? "user_turn"
+          : undefined,
+    latencyMs,
+    mcpRequestBytes: input.requestBytes,
+    mcpResponseBytes,
+    mcpUncompactedBytes,
+    tokensEst: {
+      request: tokensEstFromBytes(input.requestBytes),
+      response: overhead,
+    },
+    buckets: cost
+      ? {
+          modelRoutingUsd: cost.buckets.modelRoutingUsd,
+          judgementUsd: cost.buckets.judgementUsd,
+          mcpOverheadTokens: overhead,
+        }
+      : { modelRoutingUsd: 0, judgementUsd: 0, mcpOverheadTokens: overhead },
+    heuristicUsd: cost
+      ? {
+          jevUsd: cost.jevUsd,
+          routedUsd: cost.routedUsd,
+          frontierUsd: cost.frontierUsd,
+          savings: cost.savings,
+        }
+      : undefined,
+    speed:
+      cost && latencyMs != null
+        ? {
+            jevMs: latencyMs,
+            frontierMs: cost.speed.frontierMs,
+            routedMs: cost.speed.routedMsHint - cost.speed.jevMsHint + latencyMs,
+          }
+        : undefined,
+    toolsCatalog: tools.length || undefined,
+    toolsLoaded: tools.length ? tools.filter((t) => t.load).length : undefined,
+    summary: input.summary,
+  });
 }
 
 function summarize(name: string, result: unknown) {
@@ -239,7 +358,18 @@ export async function handleMcpRpc(body: Rpc, ctx: McpCtx = {}) {
         engine,
         summary: summarize(name, result),
       });
-      return ok(id, wrapToolResult(name, result, activity));
+      const wrapped = wrapToolResult(name, result, activity);
+      recordCallMetrics({
+        name,
+        args,
+        result,
+        wrapped,
+        requestBytes: Buffer.byteLength(JSON.stringify(args)),
+        engine,
+        harness: ctx.harness,
+        summary: activity.summary,
+      });
+      return ok(id, wrapped);
     } catch (e) {
       const activity = recordMcpActivity({
         tool: name,

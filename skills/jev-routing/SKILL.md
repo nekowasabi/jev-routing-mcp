@@ -17,12 +17,15 @@ jev-routing MCP が接続されているときだけ使う。
 - tool loop の各ステップ。tool が返ったあと、次の tool の前に `route_turn`（`phase=tool_loop`）
 - `run_terminal_command` / `write` / `search_replace` の実行前に `gate_call`
 - 破壊的な tool 結果、またはシークレットが混ざりそうな出力のあとに `judge_output`
+- 文脈が大きいとき、またはサマリー／引き継ぎを書く前に `compact`
 
 使わない:
 
 - jev-routing MCP が未接続
 - `[JEV EXECUTED]` で始まる判定のやり直し
 - 引数の中身を埋める作業そのもの（Jev は選択とゲートであり、生成はモデル側）
+- `compact` に本文フルを渡す
+- `drop` した id の本文を再掲する
 
 ## 手順
 
@@ -30,5 +33,6 @@ jev-routing MCP が接続されているときだけ使う。
 2. Tool loop → `route_turn` with `phase=tool_loop`, `pinnedModel` from the previous result, plus `lastTool`, `lastOutput`, and `actionsTaken` (tools already run this turn). If `loop.continue` is false, stop and answer. If `loop.gated` is true, a premature stop was vetoed — follow `loop.nextTool`.
 3. Before `run_terminal_command` / `write` / `search_replace` → `gate_call`. Block only when `allow` is false.
 4. After a risky tool result → `judge_output`.
+5. Large context or before a handoff → `compact` with stubs only (`id` / `kind` / `chars` / `preview`). After it returns, do not quote dropped ids; keep only the head of truncated results. That is the apply step.
 
 A result that starts with `[JEV EXECUTED]` means Jev already replaced the frontier judgement. Do not re-decide the same choice.

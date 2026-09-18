@@ -124,6 +124,7 @@ curl -s http://127.0.0.1:8787/mcp \
 | `evaluate` | 任意の Choice / Score / Noul |
 | `screen` | プロンプトインジェクション審査 |
 | `verify` | 主張と証拠の突合 |
+| `compact` | stub の keep / truncate / drop（本文フルは送らない） |
 
 `engine: "local"` を引数に付けると、キーがあってもオンデバイスに固定します。
 

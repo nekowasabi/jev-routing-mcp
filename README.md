@@ -124,6 +124,7 @@ curl -s http://127.0.0.1:8787/mcp \
 | `evaluate` | Arbitrary Choice / Score / Noul |
 | `screen` | Prompt injection screening |
 | `verify` | Claim-to-evidence matching |
+| `compact` | Keep / truncate / drop stubs (not full bodies) |
 
 Adding `engine: "local"` to the arguments pins execution on-device even when a key is present.
 

@@ -44,6 +44,11 @@ export const DEFAULT_TOOLS: ToolDef[] = [
     description:
       "Call an installed MCP tool by name with JSON arguments. Not for ordinary workspace read/edit/shell.",
   },
+  {
+    name: "compact",
+    description:
+      "Score conversation items (id/kind/chars/preview stubs) for keep/truncate/drop. Do not send full bodies. Use when context is large or before a handoff. Not for reading or editing files.",
+  },
 ];
 
 export const GROK_TOOLS: ToolDef[] = [
@@ -104,6 +109,11 @@ export const GROK_TOOLS: ToolDef[] = [
     name: "spawn_subagent",
     description:
       "Delegate a bounded task to a child agent. Not for a single cheap tool call the parent can do itself.",
+  },
+  {
+    name: "compact",
+    description:
+      "Score conversation items (id/kind/chars/preview stubs) for keep/truncate/drop. Do not send full bodies. Use when context is large or before a handoff. Not for reading or editing files.",
   },
 ];
 

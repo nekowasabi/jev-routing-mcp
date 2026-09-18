@@ -49,12 +49,15 @@ export type CompactStats = {
   truncated: number;
   dropped: number;
   pinned: number;
+  items: number;
+  stateTokens: number;
+  stateStage: string;
+  requests: number;
 };
 
 export type CompactResult = {
   decisions: CompactDecision[];
   stats: CompactStats;
-  questions: Record<string, NoulQuestion>;
 };
 
 export type NoulAnswer = {

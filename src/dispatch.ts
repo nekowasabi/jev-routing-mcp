@@ -19,9 +19,12 @@ import {
   modelIdFor,
   normalizePinned,
 } from "./policy.ts";
+import { compactItems as runCompact, type CompactOptions } from "./compact.ts";
 import type {
   ActionOp,
   Answer,
+  CompactItem,
+  CompactResult,
   GateCallInput,
   GateVerdict,
   Harness,
@@ -424,6 +427,16 @@ export const localDecide = (req: SystemOneRequest) => decideLocal(req);
 
 export async function evaluateRaw(req: SystemOneRequest, decide: Decider) {
   return decide(req);
+}
+
+export async function compactItems(
+  input: { items: CompactItem[] } & CompactOptions,
+  decide: Decider,
+  engine: EngineKind = "local",
+): Promise<CompactResult & { engine: EngineKind; latencyMs: number }> {
+  const started = performance.now();
+  const result = await runCompact(input, decide);
+  return { ...result, engine, latencyMs: performance.now() - started };
 }
 
 export type { Answer };

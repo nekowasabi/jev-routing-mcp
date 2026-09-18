@@ -37,6 +37,21 @@ export type MetricsEvent = {
   toolsCatalog?: number;
   toolsLoaded?: number;
   summary: string;
+  compaction?: {
+    items: number;
+    charsBefore: number;
+    charsAfter: number;
+    charsDropped: number;
+    kept: number;
+    truncated: number;
+    dropped: number;
+    pinned: number;
+    stateTokens: number;
+    stateStage: string;
+    jevRequests: number;
+    netChars: number;
+    netTokensEst: number;
+  };
 };
 
 export function appendMetrics(event: MetricsEvent): void {

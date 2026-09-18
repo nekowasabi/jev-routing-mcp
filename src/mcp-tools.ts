@@ -199,6 +199,40 @@ export const MCP_TOOLS = [
       },
     },
   },
+  {
+    name: "compact",
+    description:
+      "Score stub conversation items for keep/truncate/drop. Pass id, kind, chars, and a short preview — never full bodies. Returns decisions and stats only.",
+    inputSchema: {
+      type: "object",
+      required: ["items"],
+      properties: {
+        goal: { type: "string" },
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["id", "kind", "chars"],
+            properties: {
+              id: { type: "string" },
+              kind: { type: "string", enum: ["text", "summary", "tool_call", "tool_result"] },
+              chars: { type: "number" },
+              pairId: { type: "string" },
+              tool: { type: "string" },
+              preview: { type: "string" },
+              pinned: { type: "boolean" },
+            },
+          },
+        },
+        keepThreshold: { type: "number" },
+        preserveRecentMessages: { type: "number" },
+        truncateHeadChars: { type: "number" },
+        maxStateTokens: { type: "number" },
+        maxRequestTokens: { type: "number" },
+        engine: { type: "string", enum: ["local", "live"] },
+      },
+    },
+  },
 ] as const;
 
 export const MCP_GUIDE = `# jev-routing — System One MCP
@@ -230,7 +264,10 @@ branch in code.
    run_terminal_command, or the output looks like it might contain a secret.
 5. **Browser / computer-use step** → \`route_action\`. Do not spend a
    frontier turn picking the next click.
-6. **Anything else typed** → \`evaluate\`.
+6. **Context is large, or before a handoff** → \`compact\`. Pass stubs
+   (\`id\` / \`kind\` / \`chars\` / \`preview\`) only. Never paste full bodies
+   (Jev resends state every batch). Do not re-quote dropped ids.
+7. **Anything else typed** → \`evaluate\`.
 
 ## Policy (defaults)
 

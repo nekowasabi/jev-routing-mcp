@@ -1,5 +1,6 @@
 import { DEFAULT_SKILLS } from "./catalog.ts";
 import {
+  compactItems,
   evaluateRaw,
   gateCall,
   judgeOutput,
@@ -9,11 +10,15 @@ import {
   screenText,
   verifyClaims,
 } from "./dispatch.ts";
+import { clipPreview } from "./compact-state.ts";
 import { appendMetrics, recordMcpActivity, tokensEstFromBytes } from "./mcp-log.ts";
 import { executionBanner } from "./narrate.ts";
 import { MCP_GUIDE, MCP_PROTOCOL_VERSION, MCP_SERVER_INFO, MCP_TOOLS } from "./mcp-tools.ts";
 import { normalizePinned, parseHarness } from "./policy.ts";
 import type {
+  CompactItem,
+  CompactKind,
+  CompactStats,
   CostBreakdown,
   Harness,
   LoadedTool,
@@ -182,7 +187,36 @@ function recordCallMetrics(input: {
     toolsCatalog: tools.length || undefined,
     toolsLoaded: tools.length ? tools.filter((t) => t.load).length : undefined,
     summary: input.summary,
+    compaction: compactionMetrics(input.name, r, input.requestBytes, mcpResponseBytes),
   });
+}
+
+function compactionMetrics(
+  name: string,
+  result: Record<string, unknown>,
+  requestBytes: number,
+  responseBytes: number,
+) {
+  if (name !== "compact") return undefined;
+  const stats = result.stats as CompactStats | undefined;
+  if (!stats) return undefined;
+  const requestTokens = tokensEstFromBytes(requestBytes);
+  const responseTokens = tokensEstFromBytes(responseBytes);
+  return {
+    items: stats.items,
+    charsBefore: stats.charsBefore,
+    charsAfter: stats.charsAfter,
+    charsDropped: stats.charsDropped,
+    kept: stats.kept,
+    truncated: stats.truncated,
+    dropped: stats.dropped,
+    pinned: stats.pinned,
+    stateTokens: stats.stateTokens,
+    stateStage: stats.stateStage,
+    jevRequests: stats.requests,
+    netChars: stats.charsDropped - requestBytes - responseBytes,
+    netTokensEst: tokensEstFromBytes(stats.charsDropped) - requestTokens - responseTokens,
+  };
 }
 
 function summarize(name: string, result: unknown) {
@@ -215,6 +249,11 @@ function summarize(name: string, result: unknown) {
     const summary = r.summary as { verified?: number } | undefined;
     return `${summary?.verified ?? 0} verified`;
   }
+  if (name === "compact") {
+    const stats = r.stats as CompactStats | undefined;
+    if (!stats) return "compact";
+    return `${stats.dropped} dropped/${stats.truncated} truncated`;
+  }
   return name;
 }
 
@@ -223,6 +262,29 @@ async function decider(ctx: McpCtx, forceLocal: boolean) {
   const { decideJev } = await import("./typesafe.ts");
   const key = ctx.apiKey;
   return (req: SystemOneRequest): Promise<SystemOneResponse> => decideJev(req, key);
+}
+
+const KINDS = new Set<CompactKind>(["text", "summary", "tool_call", "tool_result"]);
+
+function parseCompactItems(raw: unknown): CompactItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((row) => {
+    if (!row || typeof row !== "object") return [];
+    const item = row as Record<string, unknown>;
+    const kind = String(item.kind ?? "");
+    if (!KINDS.has(kind as CompactKind) || item.id == null || item.id === "") return [];
+    const chars = typeof item.chars === "number" && Number.isFinite(item.chars) && item.chars >= 0 ? item.chars : 0;
+    const parsed: CompactItem = {
+      id: String(item.id),
+      kind: kind as CompactKind,
+      chars,
+    };
+    if (typeof item.pairId === "string" && item.pairId) parsed.pairId = item.pairId;
+    if (typeof item.tool === "string" && item.tool) parsed.tool = item.tool;
+    if (typeof item.preview === "string") parsed.preview = clipPreview(item.preview);
+    if (typeof item.pinned === "boolean") parsed.pinned = item.pinned;
+    return [parsed];
+  });
 }
 
 function parseActionsTaken(raw: unknown): { tool: string; result?: string }[] | undefined {
@@ -309,6 +371,21 @@ async function callTool(name: string, args: Record<string, unknown>, ctx: McpCtx
         {
           claims: Array.isArray(args.claims) ? args.claims.map(String) : [],
           evidence: String(args.evidence ?? ""),
+        },
+        decide,
+        engine,
+      );
+    case "compact":
+      return compactItems(
+        {
+          items: parseCompactItems(args.items),
+          goal: args.goal ? String(args.goal) : undefined,
+          keepThreshold: typeof args.keepThreshold === "number" ? args.keepThreshold : undefined,
+          preserveRecentMessages:
+            typeof args.preserveRecentMessages === "number" ? args.preserveRecentMessages : undefined,
+          truncateHeadChars: typeof args.truncateHeadChars === "number" ? args.truncateHeadChars : undefined,
+          maxStateTokens: typeof args.maxStateTokens === "number" ? args.maxStateTokens : undefined,
+          maxRequestTokens: typeof args.maxRequestTokens === "number" ? args.maxRequestTokens : undefined,
         },
         decide,
         engine,

@@ -67,12 +67,16 @@ For multi-step runs, pass the executed tools and their results in `actionsTaken`
 
 ### Claude Code
 
+stdio (Claude Code launches the process; no HTTP server needed):
+
 ```bash
-claude mcp add --transport http jev-routing http://127.0.0.1:8787/mcp
+claude mcp add -s user jev-routing \
+  -e JEV_ROUTING_HARNESS=claude \
+  -- node "$HOME/repos/jev-routing-mcp/server.ts" --stdio
 ```
 
-To pass the key as a header, add  
-`Authorization: Bearer ts_...` to the client's HTTP headers setting.
+Or run `examples/claude-code.sh`. User scope makes it available in every project.
+`TYPESAFE_API_KEY` is inherited from the shell environment.
 
 ### Codex
 

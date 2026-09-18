@@ -67,12 +67,16 @@ Grok の TUI で tool 結果の先頭が `[JEV EXECUTED]` なら、Jev がフロ
 
 ### Claude Code
 
+stdio（Claude Code がプロセスを起動する。HTTP サーバーは不要）:
+
 ```bash
-claude mcp add --transport http jev-routing http://127.0.0.1:8787/mcp
+claude mcp add -s user jev-routing \
+  -e JEV_ROUTING_HARNESS=claude \
+  -- node "$HOME/repos/jev-routing-mcp/server.ts" --stdio
 ```
 
-キーをヘッダで渡す場合はクライアントの HTTP headers 設定に  
-`Authorization: Bearer ts_...` を追加してください。
+または `examples/claude-code.sh` を実行する。user スコープなので全プロジェクトで使える。
+`TYPESAFE_API_KEY` はシェル環境から継承する。
 
 ### Codex
 

@@ -144,6 +144,7 @@ function recordCallMetrics(input: {
   const overhead = tokensEstFromBytes(mcpResponseBytes);
   appendMetrics({
     at: Date.now(),
+    ...(process.env.JEV_ROUTING_RUN_ID ? { runId: process.env.JEV_ROUTING_RUN_ID } : {}),
     tool: input.name,
     engine: input.engine,
     harness: (typeof r.harness === "string" ? parseHarness(r.harness) : undefined) ?? input.harness,

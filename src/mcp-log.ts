@@ -18,6 +18,7 @@ export function tokensEstFromBytes(bytes: number): number {
 
 export type MetricsEvent = {
   at: number;
+  runId?: string;
   tool: string;
   engine: "local" | "live";
   harness?: Harness;

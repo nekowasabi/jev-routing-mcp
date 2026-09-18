@@ -21,6 +21,42 @@ export type ScoreQuestion = {
 
 export type Question = NoulQuestion | ChoiceQuestion | ScoreQuestion;
 
+export type CompactKind = "text" | "summary" | "tool_call" | "tool_result";
+
+export type CompactItem = {
+  id: string;
+  kind: CompactKind;
+  chars: number;
+  pairId?: string;
+  tool?: string;
+  preview?: string;
+  pinned?: boolean;
+};
+
+export type CompactAction = "keep" | "truncate" | "drop";
+
+export type CompactDecision = {
+  id: string;
+  action: CompactAction;
+  pinned: boolean;
+};
+
+export type CompactStats = {
+  charsBefore: number;
+  charsAfter: number;
+  charsDropped: number;
+  kept: number;
+  truncated: number;
+  dropped: number;
+  pinned: number;
+};
+
+export type CompactResult = {
+  decisions: CompactDecision[];
+  stats: CompactStats;
+  questions: Record<string, NoulQuestion>;
+};
+
 export type NoulAnswer = {
   type: "noul";
   noul: number;
